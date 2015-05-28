@@ -68,9 +68,10 @@ void FeatureTracker::kalmanCorrect()
 void FeatureTracker::kalmanDraw( Mat img )
 {
 	// draw predicted point
-	//rectangle(img, kalman.predictPt, kalman.predictPt+Point(kalman.width, kalman.height), Scalar(b, g, r), 3);
+	rectangle(img, kalman.predictPt, kalman.predictPt+Point(kalman.width, kalman.height), Scalar(b, g, r), 3);
+
 	// draw stated rectangle
-	rectangle(img, kalman.statePt, kalman.statePt+Point(kalman.width, brisk.person1.height), Scalar(b, g, r), 3);
+	//rectangle(img, kalman.statePt, kalman.statePt+Point(kalman.width, brisk.person1.height), Scalar(b, g, r), 3);
 	stringstream ss;
 	ss<<kalman.predictPt;
 	putText(img, ss.str(), Point(kalman.predictPt.x, kalman.predictPt.y-5), 0, 0.8, Scalar(128, 255, 128), 2);

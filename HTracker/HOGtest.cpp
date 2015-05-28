@@ -103,14 +103,18 @@ void HOGtest::show(cv::Mat& image)
 
 	for (i = 0; i < this->found_filtered.size(); i++) {
 		// If the position of rect is out of image range, relocatse.
-		if( this->found_filtered[i].x < 0 )
+		int x = this->found_filtered[i].x,
+			y = this->found_filtered[i].y,
+			width = this->found_filtered[i].width,
+			height = this->found_filtered[i].height;
+		if( x < 0 )
 			this->found_filtered[i].x = 0;
-		if( this->found_filtered[i].y < 0 )
+		if( y < 0 )
 			this->found_filtered[i].y = 0;
-		if( this->found_filtered[i].x + this->found_filtered[i].width >= WINDOW_WIDTH )
-			this->found_filtered[i].x = WINDOW_WIDTH - this->found_filtered[i].width;
-		if( this->found_filtered[i].y + this->found_filtered[i].height >= WINDOW_HEIGHT )
-			this->found_filtered[i].y = WINDOW_HEIGHT - this->found_filtered[i].height;
+		if( x + width >= WINDOW_WIDTH )
+			this->found_filtered[i].x = WINDOW_WIDTH - width;
+		if( y + height >= WINDOW_HEIGHT )
+			this->found_filtered[i].y = WINDOW_HEIGHT - height;
 
 		Rect r = this->found_filtered[i];
 		rectangle(image, r.tl(), r.br(), Scalar(64, 255, 64), 3);	// 검출된 모든 사람에 녹색 사각형 그림

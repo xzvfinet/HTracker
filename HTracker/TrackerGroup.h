@@ -7,6 +7,7 @@ public:
 	TrackerGroup(void);
 	~TrackerGroup(void);
 
+	void kalmanPredict();
 	void kalmanUpdate();						// update all trackers's kalman
 	FeatureTracker operator[](int i);
 	void setThreshold();						// set threshold

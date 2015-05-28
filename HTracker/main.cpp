@@ -123,7 +123,7 @@ int executeAllFile(TCHAR *c,int argc, vector<string>& fileNames)
 }
 
 void myDetectMultiScale(HOGDescriptor* hog, Mat img, vector<Rect>& found, double hitThreshold,
-	int topFoot, int bottomFoot, double ratio, int realHeightAtTop, int acceptableDetla);
+	int topFoot, int bottomFoot, double ratio, int realHeightAtTop);
 
 int main()
 {
@@ -134,18 +134,14 @@ int main()
 #else
 	//VideoCapture cap("D:/ChungAngDrone/dataset/mitsubishi.avi");
 	//VideoCapture cap("D:/ChungAngDrone/dataset/campus4-c2.avi");
-	VideoCapture cap("D:/ChungAngDrone/dataset/campusmulti.avi");
-	//VideoCapture cap("D:/ChungAngDrone/dataset/cau/04.mp4");
+	VideoCapture cap("D:/backup/ChungAngDrone/dataset/campusmulti.avi");
+	//VideoCapture cap("D:/backup/ChungAngDrone/dataset/cau/04.mp4");
 	//VideoCapture cap("D:/중앙드론팀/dataset/cau/media_20141028_144547/frame(%d).jpg");
 	if(!cap.isOpened()) { // check if we succeeded
 		printf("Error opening video!\n");
 		return EXIT_FAILURE;
 	}
 	const char filename[30] = "result.avi";
-#ifdef VIDEOWRITER
-	VideoWriter writer;
-	writer.open("result.avi", -1, 10, Size(768, 576));
-#endif
 #endif
 	
 	char ch=0;
@@ -155,9 +151,10 @@ int main()
 	Mat trans = imread("data/transparent2.png", IMREAD_UNCHANGED);
 	Mat asdf;
 
-	/************************************************************************/
+	bool newDetect = true;
+	bool firstMatch = true;
+
 	/* HOG, Kalman, Matcher init                                            */
-	/************************************************************************/
 	HOGtest hog;
 	hog.init();
 	HOGDescriptor hogd;
@@ -165,151 +162,69 @@ int main()
 	TrackerGroup trackers;
 	trackers.setThreshold();
 
-	/***********************************************************************/
 	/* Loop variables                                                      */
-	/***********************************************************************/
 	bool start_detect=true, start_track=true, start_match=false, start_save=true;
 	int frame=0;
 	int count=0;
 	int detectingRate=8;	// 1 detect per 4 frame
 	int matchingCount=0;		// 3 match per 4 frame
-	
-	/************************************************************************/
+
 	/* Start loop                                                           */
-	/************************************************************************/
 	char dir[40];
 	while(ch != 'c')
 	{
-		/********************************/
-		/* capture from video           */
-		/********************************/
-		
-#ifdef SEQUENCE
-		if(count<filenames.size()) {
-			sprintf(dir, "seq/%s", filenames[count].c_str());
-			captured = imread(dir);
-		}
-		else
-			captured.release();
-#else
-		cap>>captured;
-#endif
-		if(captured.empty()) {
+		cap >> captured;
+		if (captured.empty()) {
 			cout<<"no image to be captured"<<endl;
 			break;
 		}
 		
  		
-		//resize(captured, captured, Size(640, 360)); // for cau dataset
-  		//GaussianBlur( captured, blurred, Size( 7, 7 ), 0, 0 );	// it costs approximately 0.02sec (hajin laptop)
+// 		resize(captured, captured, Size(640, 360)); // for cau dataset
+//   	GaussianBlur( captured, blurred, Size( 7, 7 ), 0, 0 );	// it costs approximately 0.02sec (hajin laptop)
 
 		hogimg = captured.clone();
 
-		/************************************************************************/
 		/* 1. Detect                                                            */
-		/************************************************************************/
 		if(start_detect && count%detectingRate<1) {
-			//cout<<"hog"<<endl;
-			
-#ifdef MYDETECT
-			myDetectMultiScale(&hogd, blurred, found, 0.0, 500, 676, 2.3, 70, 0);  
-#else
-			hog.detect(captured);// hog uses blurred image
-#endif // MYDETECT
-
-#ifdef WRITE_DETECTED
-			if(!hog.found_filtered.empty()) {
-				for(int i=0; i<hog.found_filtered.size(); i++) {
-					if(hog.found_filtered[i].x + 32 < hogimg.cols &&
-						hog.found_filtered[i].y + 32 < hogimg.rows)
-						imageWrite("fp",hogimg(hog.found_filtered[i]), Size(32, 32));
-				}
-			}
-#endif
+			hog.detect(hogimg);
+			newDetect = true;
 		}
 		hog.show(hogimg);
-#ifdef MYDETECT
-		for (int i = 0; i < found.size(); i++)
-			rectangle(hogimg, found[i], Scalar(0, 255, 0), 2);
-#endif // MYDETECT
-
-
-		//trackers.drawMap(map_background);
-
-		//imshow("trans", trans);
-		//overlayImage(hogimg, trans, hogimg, Point(0, 0));
-
-		/************************************************************************/
-		/*                                                                      */
-		/************************************************************************/
-// 		resize(captured, captured, Size(captured.cols*2, captured.rows*2));
-// 		for(int i=0; i<hog.found_filtered.size(); i++) {
-// 			hog.found_filtered[i] = Rect(hog.found_filtered[i].x*2, hog.found_filtered[i].y*2,hog.found_filtered[i].width*2, hog.found_filtered[i].height*2);
-// 		}
 		kalmanimg = captured.clone();
 		
-		/************************************************************************/
 		/* 2. Match and Track                                                   */
-		/************************************************************************/
- 		trackers.match(kalmanimg, hog.found_filtered);
- 		trackers.draw(kalmanimg);
+		trackers.match(kalmanimg, hog.found_filtered);
+		if (newDetect) {
+			trackers.kalmanUpdate();
+			newDetect = false;
+		}
+		else {
+			trackers.kalmanPredict();
+		}
 
-		/************************************************************************/
+		trackers.draw(kalmanimg);
+
 		/* Show                                                                 */
-		/************************************************************************/
 		imshow("hog", hogimg);
 		imshow("kalman", kalmanimg);
 
-		/************************************************************************/
-		/* imwrite                                                              */
-		/************************************************************************/
-#ifdef IMWRITE
-		char filename[30];
-		sprintf(filename, "frame/frame%d.jpg", count);
-		imwrite(filename, hogimg);
-#endif
-#ifdef VIDEOWRITER
-		writer << kalmanimg;
-#endif
 
-
-		/********************************/
 		/* Other                        */
-		/********************************/
-		ch = waitKey(10);
+		ch = waitKey(30);
 		count++;
-		
-		/********************************/
-		/* Debug                        */
-		/********************************/
-#if 0
-		if(start_detect) cout<<"1true ";
-		if(start_match)  cout<<"2true ";
-		if(start_track)  cout<<"3true"<<endl;
-#elif 0
-		if(ch == 'r')			// push 'r' when you want reset the person
-			start_save = true;
-#endif
 	}
 
-#ifdef VIDEOWRITER
-	writer.release();
-#endif
 
 	return 0;
 }
 
 void myDetectMultiScale(HOGDescriptor* hog, Mat img, vector<Rect>& found, double hitThreshold,
-	int topFoot, int bottomFoot, double ratio, int realHeightAtTop, int acceptableDetla) {
-
-	// scaling할 image level 수를 결정 계산 //
+	int topFoot, int bottomFoot, double ratio, int realHeightAtTop) {
 
 	// 1. nlevel 결정
-	int nlevels = cvFloor((log(ratio)) / (log(1.05))) + 1;	 // 몇개의 scale을 사용할건지
+	int nlevels = cvFloor((log(ratio)) / (log(1.05))) + 1;
 	int yStride = (bottomFoot - topFoot) / nlevels;
-	//int nlevels = 15;
-	//int yStride = 6;
-
 
 	// 2. 각 level별 scale 입력
 	double scale = 1.;
@@ -318,23 +233,16 @@ void myDetectMultiScale(HOGDescriptor* hog, Mat img, vector<Rect>& found, double
 	vector<double> levelScale;
 	for (level = 0; level < nlevels; level++)
 	{
-		levelScale.push_back(scale);	// 여기에서 scale을 걸러야 할지 고민..
+		levelScale.push_back(scale);
 		scale *= factor;
 	}
 	level = std::max(level, 1);
 
-	vector<Rect> allCandidates;
 	Size winStride = Size(8, 8);
 	Size padding = Size(0, 0);
-	// 	Mutex mtx;
-	// 
-	// 	parallel_for_(Range(0, (int)levelScale.size()), 
-	// 		HOGInvoker(hog, img, hitThreshold, winStride, padding, &levelScale[0], &allCandidates, &mtx,
-	// 		topFoot, bottomFoot, ratio, realHeightAtTop, yStride));
 
 	int i, i1 = 0, i2 = levelScale.size() - 1;
 
-	// Mat의 버퍼를 미리 확보해 시간을 줄인다.
 	double maxScale = levelScale[i2];	// 최대 scale factor
 	Size maxSz(img.cols, cvCeil(realHeightAtTop*maxScale));	// 최대 Size
 	Mat smallerImgBuf(maxSz, img.type());
@@ -352,23 +260,22 @@ void myDetectMultiScale(HOGDescriptor* hog, Mat img, vector<Rect>& found, double
 		cout << "presentHeight: " << presentHeight << endl;
 		double presentFactor = presentHeight / 128.0;
 		int presentHead = presentFoot - presentHeight;
-		if (presentHead < 0) cout << "키가 음수가 되버림" << endl;
 
-		Size sz(cvRound(img.cols / presentFactor), cvRound(presentHeight / presentFactor));	// probable size of img
-		Mat smallerImg(sz, img.type(), smallerImgBuf.data);			// 아마 이것도 버퍼 확보용
+		// probable size of img
+		Size sz(cvRound(img.cols / presentFactor), cvRound(presentHeight / presentFactor));
+		Mat smallerImg(sz, img.type(), smallerImgBuf.data);
 
-		if (sz == img.size())	// scale factor가 1 일 때
-			smallerImg = Mat(sz, img.type(), img.data, img.step);	// step은 이미지 채널(3-channel등) 관련
+		if (sz == img.size())
+			smallerImg = Mat(sz, img.type(), img.data, img.step);
 		else {	// 나머지는 resize
-			//rectangle(img, Rect(0, presentHead, img.cols, presentHeight), Scalar((20*i)%255, (50*i)%255, (90*i)%255), 1);
 			resize(img(Rect(0, presentHead, img.cols, presentHeight)), smallerImg, sz);
 			imshow("before", img(Rect(0, presentHead, img.cols, presentHeight)));
 			imshow("after", smallerImg);
 			cout << smallerImg.cols << " " << smallerImg.rows << endl;
 			waitKey(10);
 		}
-		// smallerImg가 사이즈 변경된 부분이다!
 		
+		// smallerImg가 사이즈 변경된 부분이다!
 		hog->detect(smallerImg, locations, hitsWeights, hitThreshold, winStride, padding);
 
 		for (int i = 0; i<locations.size(); i++)
@@ -386,11 +293,4 @@ void myDetectMultiScale(HOGDescriptor* hog, Mat img, vector<Rect>& found, double
 		presentFoot += yStride;
 		if (presentFoot > bottomFoot) presentFoot = bottomFoot;
 	}
-
-
-	// groupRectangles();	// is needed
-
-	// 		for(int j=0; j<temp_found.size(); j++) {
-	// 			found.push_back( Rect(temp_found[j], temp_found[j]+Point(personHeight/2 ,personHeight)) );
-	// 		}
 }

@@ -31,12 +31,12 @@
 using namespace std;
 using namespace cv;
 
-#define WINDOW_WIDTH 1280	//360 768
-#define WINDOW_HEIGHT 720	//288 432
+#define WINDOW_WIDTH 360	//360 768
+#define WINDOW_HEIGHT 288	//288 432
 
 //#define IMWRITE
 //#define WRITE_DETECTED
 //#define SEQUENCE
 //#define HEAD
-#define MYDETECT
+//#define MYDETECT
 //#define VIDEOWRITER
